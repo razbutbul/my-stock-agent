@@ -1,0 +1,10 @@
+{
+  "name": "my-stock-agent",
+  "private": true,
+  "scripts": {
+    "server": "npm run start:dev --prefix server",
+    "client": "npm run dev --prefix client",
+    "server:build": "npm run build --prefix server",
+    "client:build": "npm run build --prefix client"
+  }
+}

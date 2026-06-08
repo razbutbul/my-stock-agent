@@ -1,0 +1,110 @@
+.home-page {
+  max-width: 520px;
+  margin: 4rem auto;
+  padding: 2rem;
+  font-family: system-ui, -apple-system, sans-serif;
+  text-align: center;
+}
+
+.home-page h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.75rem;
+}
+
+.home-page h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
+}
+
+.subtitle {
+  margin: 0 0 2rem;
+  color: #666;
+}
+
+.message {
+  padding: 1rem;
+  border-radius: 8px;
+}
+
+.message.loading {
+  background: #f0f4ff;
+  color: #334;
+}
+
+.message.error {
+  background: #fff0f0;
+  color: #a33;
+}
+
+.status-card {
+  padding: 1.25rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fafafa;
+  text-align: left;
+}
+
+.status-card p {
+  margin: 0.5rem 0;
+}
+
+.stock-section {
+  margin-top: 3rem;
+  text-align: left;
+}
+
+.stock-form label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.stock-form-row {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.stock-form input {
+  flex: 1;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 1rem;
+}
+
+.stock-form button {
+  padding: 0.65rem 1rem;
+  border: none;
+  border-radius: 8px;
+  background: #1a56db;
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.stock-form button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.stock-card h2 {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+}
+
+.insights-card h2 {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+}
+
+.tools-used {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.insights-text {
+  margin: 0;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
