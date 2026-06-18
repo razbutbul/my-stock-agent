@@ -7,11 +7,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.setGlobalPrefix('api');
   app.enableCors({
-    origin: [
-      'http://localhost:5173',
-      'http://localhost:1111',
-      'https://my-stock-agent-1.onrender.com/',
-    ],
+    origin: true,
     credentials: true,
   });
 
