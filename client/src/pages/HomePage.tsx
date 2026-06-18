@@ -1,19 +1,30 @@
-import { StatusCard } from '../components/StatusCard';
-import { StockInsightsCard } from '../components/StockInsightsCard';
-import { StockLookupForm } from '../components/StockLookupForm';
-import { StockQuoteCard } from '../components/StockQuoteCard';
-import { useHealth } from '../hooks/useHealth';
-import { useStockAnalysis } from '../hooks/useStockAnalysis';
-import { useStockLookup } from '../hooks/useStockLookup';
+import AutoGraphOutlinedIcon from "@mui/icons-material/AutoGraphOutlined";
+import QueryStatsOutlinedIcon from "@mui/icons-material/QueryStatsOutlined";
+import {
+  Alert,
+  AppBar,
+  Box,
+  Container,
+  LinearProgress,
+  Link,
+  Paper,
+  Stack,
+  Toolbar,
+  Typography,
+} from "@mui/material";
+import { StatusCard } from "../components/StatusCard";
+import { StockInsightsCard } from "../components/StockInsightsCard";
+import { StockLookupForm } from "../components/StockLookupForm";
+import { YahooToolsExplorer } from "../components/YahooToolsExplorer";
+import { useHealth } from "../hooks/useHealth";
+import { useStockAnalysis } from "../hooks/useStockAnalysis";
 
 export function HomePage() {
-  const { data: health, loading: healthLoading, error: healthError } = useHealth();
   const {
-    data: stock,
-    loading: stockLoading,
-    error: stockError,
-    lookup,
-  } = useStockLookup();
+    data: health,
+    loading: healthLoading,
+    error: healthError,
+  } = useHealth();
   const {
     data: insight,
     loading: analysisLoading,
@@ -22,55 +33,79 @@ export function HomePage() {
   } = useStockAnalysis();
 
   return (
-    <main className="home-page">
-      <h1>Stock Analyst Agent</h1>
-      <p className="subtitle">Server connection status</p>
+    <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
+      <AppBar position="sticky" elevation={0} color="transparent">
+        <Toolbar sx={{ borderBottom: 1, borderColor: "divider" }}>
+          <AutoGraphOutlinedIcon color="primary" sx={{ ml: 1 }} />
+          <Box sx={{ flexGrow: 1 }}>
+            <Typography variant="h6">Smart Stock Insight Agent</Typography>
+            <Typography variant="caption" color="text.secondary">
+              Developed by{" "}
+              <Link
+                href="https://www.linkedin.com/in/raz-butbul-07b465259/"
+                target="_blank"
+                rel="noopener noreferrer"
+                sx={{
+                  color: "primary.main",
+                  fontWeight: 600,
+                  textDecoration: "none",
+                  transition: "color 0.2s ease",
+                  "&:hover": {
+                    color: "primary.light",
+                    textDecoration: "none",
+                  },
+                }}
+              >
+                Raz Butbul
+              </Link>
+            </Typography>
+          </Box>
+          {!healthLoading && !healthError && health && (
+            <StatusCard data={health} />
+          )}
+          {healthError && (
+            <Typography variant="caption" color="error.main">
+              שרת לא זמין
+            </Typography>
+          )}
+        </Toolbar>
+      </AppBar>
 
-      {healthLoading && <p className="message loading">Loading server status...</p>}
+      <Container maxWidth="lg" sx={{ py: { xs: 3, md: 4 } }}>
+        <Stack spacing={3}>
+          <Paper sx={{ p: { xs: 2, md: 3 } }}>
+            <Stack spacing={2}>
+              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                <QueryStatsOutlinedIcon color="primary" />
+                <Box>
+                  <Typography variant="h5">ניתוח הזדמנות</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    הזן סימול מניה לקבלת הערכה מובנית: נרות ומומנטום, חדשות,
+                    פוטנציאל עסקי, חוזים, מנועי צמיחה, מתחרות, סיכונים והחלטות
+                  </Typography>
+                </Box>
+              </Stack>
 
-      {healthError && (
-        <p className="message error">Failed to reach server: {healthError}</p>
-      )}
+              <StockLookupForm
+                loading={analysisLoading}
+                onSubmit={analyze}
+                submitLabel="נתח מניה"
+                loadingLabel="מנתח..."
+                inputId="analysis-symbol"
+              />
 
-      {health && !healthLoading && !healthError && <StatusCard data={health} />}
+              {analysisLoading && <LinearProgress />}
+              {analysisError && <Alert severity="error">{analysisError}</Alert>}
+            </Stack>
+          </Paper>
 
-      <section className="stock-section">
-        <h2>Stock lookup</h2>
-        <p className="subtitle">Enter a ticker symbol to fetch live data</p>
+          {insight && !analysisLoading && !analysisError && (
+            <StockInsightsCard data={insight} />
+          )}
 
-        <StockLookupForm loading={stockLoading} onSubmit={lookup} />
-
-        {stockLoading && <p className="message loading">Fetching stock data...</p>}
-
-        {stockError && <p className="message error">{stockError}</p>}
-
-        {stock && !stockLoading && !stockError && <StockQuoteCard data={stock} />}
-      </section>
-
-      <section className="stock-section">
-        <h2>AI stock insights</h2>
-        <p className="subtitle">
-          Get ChatGPT-powered analysis based on live stock data
-        </p>
-
-        <StockLookupForm
-          loading={analysisLoading}
-          onSubmit={analyze}
-          submitLabel="Analyze"
-          loadingLabel="Analyzing..."
-          inputId="analysis-symbol"
-        />
-
-        {analysisLoading && (
-          <p className="message loading">Generating insights with ChatGPT...</p>
-        )}
-
-        {analysisError && <p className="message error">{analysisError}</p>}
-
-        {insight && !analysisLoading && !analysisError && (
-          <StockInsightsCard data={insight} />
-        )}
-      </section>
-    </main>
+          <YahooToolsExplorer />
+        </Stack>
+      </Container>
+    </Box>
   );
 }

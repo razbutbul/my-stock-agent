@@ -1,0 +1,43 @@
+export interface StockFundamentalsDto {
+  symbol: string;
+  name: string;
+  sector: string | null;
+  industry: string | null;
+  country: string | null;
+  employees: number | null;
+  businessSummary: string | null;
+  marketCap: number | null;
+  enterpriseValue: number | null;
+  trailingPe: number | null;
+  forwardPe: number | null;
+  pegRatio: number | null;
+  priceToBook: number | null;
+  beta: number | null;
+  fiftyTwoWeekChangePercent: number | null;
+  profitMargin: number | null;
+  revenue: number | null;
+  revenueGrowth: number | null;
+  grossMargin: number | null;
+  operatingMargin: number | null;
+  ebitda: number | null;
+  freeCashflow: number | null;
+  debtToEquity: number | null;
+  currentRatio: number | null;
+  analystRecommendation: string | null;
+  analystTargetMean: number | null;
+  analystTargetHigh: number | null;
+  analystTargetLow: number | null;
+  analystCount: number | null;
+  earningsGrowth: number | null;
+  nextEarningsDate: string | null;
+  exDividendDate: string | null;
+  recommendationTrend: unknown;
+  recentUpgradesDowngrades: Array<{
+    firm: string;
+    toGrade: string;
+    fromGrade: string | null;
+    action: string;
+    date: string;
+  }>;
+  earningsTrend: unknown;
+}

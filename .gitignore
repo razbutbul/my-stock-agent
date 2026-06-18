@@ -1,2 +1,8 @@
 .env
 node_modules
+
+# Build output
+dist/
+
+# Private agent prompt (edit locally, do not commit)
+**/system.prompt.md

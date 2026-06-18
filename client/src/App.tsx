@@ -1,8 +1,12 @@
 import { HomePage } from './pages/HomePage';
-import './App.css';
+import { AppProviders } from './providers/AppProviders';
 
 function App() {
-  return <HomePage />;
+  return (
+    <AppProviders>
+      <HomePage />
+    </AppProviders>
+  );
 }
 
 export default App;

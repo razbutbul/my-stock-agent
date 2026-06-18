@@ -1,3 +1,5 @@
+import SearchIcon from '@mui/icons-material/Search';
+import { Button, CircularProgress, Stack, TextField } from '@mui/material';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 
@@ -12,8 +14,8 @@ interface StockLookupFormProps {
 export function StockLookupForm({
   loading,
   onSubmit,
-  submitLabel = 'Send',
-  loadingLabel = 'Loading...',
+  submitLabel = 'שלח',
+  loadingLabel = 'טוען...',
   inputId = 'symbol',
 }: StockLookupFormProps) {
   const [symbol, setSymbol] = useState('');
@@ -24,21 +26,34 @@ export function StockLookupForm({
   };
 
   return (
-    <form className="stock-form" onSubmit={handleSubmit}>
-      <label htmlFor={inputId}>Stock symbol</label>
-      <div className="stock-form-row">
-        <input
-          id={inputId}
-          type="text"
-          value={symbol}
-          onChange={(event) => setSymbol(event.target.value)}
-          placeholder="e.g. AAPL"
-          disabled={loading}
-        />
-        <button type="submit" disabled={loading}>
-          {loading ? loadingLabel : submitLabel}
-        </button>
-      </div>
-    </form>
+    <Stack
+      component="form"
+      direction={{ xs: 'column', sm: 'row' }}
+      spacing={1.5}
+      onSubmit={handleSubmit}
+    >
+      <TextField
+        id={inputId}
+        label="סימול מניה"
+        placeholder="לדוגמה: AAPL, NVDA, TSLA"
+        value={symbol}
+        onChange={(event) => setSymbol(event.target.value.toUpperCase())}
+        disabled={loading}
+        fullWidth
+        slotProps={{
+          htmlInput: { style: { textTransform: 'uppercase' } },
+        }}
+      />
+      <Button
+        type="submit"
+        variant="contained"
+        size="large"
+        disabled={loading}
+        startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <SearchIcon />}
+        sx={{ minWidth: { sm: 180 }, px: 3, whiteSpace: 'nowrap' }}
+      >
+        {loading ? loadingLabel : submitLabel}
+      </Button>
+    </Stack>
   );
 }

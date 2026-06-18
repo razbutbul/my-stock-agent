@@ -1,24 +1,24 @@
 import { useState } from 'react';
-import { fetchStockQuote } from '../api/stocks';
-import type { StockQuote } from '../types/stock';
 
-interface UseStockLookupResult {
-  data: StockQuote | null;
+interface UseYahooToolFetchResult<T> {
+  data: T | null;
   loading: boolean;
   error: string | null;
-  lookup: (symbol: string) => Promise<void>;
+  fetch: (symbol: string) => Promise<void>;
 }
 
-export function useStockLookup(): UseStockLookupResult {
-  const [data, setData] = useState<StockQuote | null>(null);
+export function useYahooToolFetch<T>(
+  fetcher: (symbol: string) => Promise<T>,
+): UseYahooToolFetchResult<T> {
+  const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const lookup = async (symbol: string) => {
+  const fetch = async (symbol: string) => {
     const trimmed = symbol.trim();
 
     if (!trimmed) {
-      setError('Please enter a stock symbol');
+      setError('יש להזין סימול מניה');
       setData(null);
       return;
     }
@@ -27,7 +27,7 @@ export function useStockLookup(): UseStockLookupResult {
     setError(null);
 
     try {
-      const result = await fetchStockQuote(trimmed);
+      const result = await fetcher(trimmed);
       setData(result);
     } catch (err) {
       setData(null);
@@ -37,5 +37,5 @@ export function useStockLookup(): UseStockLookupResult {
     }
   };
 
-  return { data, loading, error, lookup };
+  return { data, loading, error, fetch };
 }
