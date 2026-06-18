@@ -5,4 +5,4 @@ node_modules
 dist/
 
 # Private agent prompt (edit locally, do not commit)
-**/system.prompt.md
+
