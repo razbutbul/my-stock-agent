@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { fetchStock } from '../api/stocks';
+import { fetchStockQuote } from '../api/stocks';
 import type { StockQuote } from '../types/stock';
 
 interface UseStockLookupResult {
@@ -27,7 +27,7 @@ export function useStockLookup(): UseStockLookupResult {
     setError(null);
 
     try {
-      const result = await fetchStock(trimmed);
+      const result = await fetchStockQuote(trimmed);
       setData(result);
     } catch (err) {
       setData(null);

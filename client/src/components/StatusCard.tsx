@@ -1,3 +1,5 @@
+import CheckCircleOutlineOutlinedIcon from '@mui/icons-material/CheckCircleOutlineOutlined';
+import { Chip, Stack, Typography } from '@mui/material';
 import type { HealthResponse } from '../types/health';
 
 interface StatusCardProps {
@@ -6,13 +8,17 @@ interface StatusCardProps {
 
 export function StatusCard({ data }: StatusCardProps) {
   return (
-    <div className="status-card">
-      <p>
-        <strong>Status:</strong> {data.status}
-      </p>
-      <p>
-        <strong>Service:</strong> {data.service}
-      </p>
-    </div>
+    <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+      <Chip
+        icon={<CheckCircleOutlineOutlinedIcon />}
+        label={data.status}
+        color="success"
+        size="small"
+        variant="outlined"
+      />
+      <Typography variant="body2" color="text.secondary">
+        {data.service}
+      </Typography>
+    </Stack>
   );
 }
