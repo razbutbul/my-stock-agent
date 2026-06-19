@@ -24,7 +24,7 @@ export function YahooToolsExplorer() {
   return (
     <Paper sx={{ p: { xs: 2, md: 3 } }}>
       <Stack spacing={2.5}>
-        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
           <StorageOutlinedIcon color="primary" />
           <Box>
             <Typography variant="h6">בדיקת נתוני Yahoo</Typography>

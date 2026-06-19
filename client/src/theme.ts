@@ -32,6 +32,26 @@ export const theme = createTheme({
     borderRadius: 14,
   },
   components: {
+    MuiButton: {
+      styleOverrides: {
+        startIcon: {
+          marginInlineEnd: 8,
+          marginInlineStart: -2,
+        },
+        endIcon: {
+          marginInlineStart: 8,
+          marginInlineEnd: -2,
+        },
+      },
+    },
+    MuiChip: {
+      styleOverrides: {
+        icon: {
+          marginInlineStart: 6,
+          marginInlineEnd: -2,
+        },
+      },
+    },
     MuiCard: {
       styleOverrides: {
         root: {

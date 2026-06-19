@@ -1,4 +1,20 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: stockagent
+      POSTGRES_PASSWORD: stockagent
+      POSTGRES_DB: stockagent
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stockagent -d stockagent"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   server:
     build: ./server
     env_file:
@@ -7,9 +23,17 @@ services:
       - "3000:3000"
     environment:
       PORT: 3000
+      DATABASE_URL: postgresql://stockagent:stockagent@postgres:5432/stockagent
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: sh -c "npx prisma migrate deploy && npm run start:dev"
   client:
     build: ./client
     ports:
       - "1111:5173"
     depends_on:
       - server
+
+volumes:
+  postgres_data:

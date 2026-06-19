@@ -37,6 +37,7 @@ import {
   parseInsightSections,
 } from '../utils/parseInsightSections';
 import { InsightSectionContent } from './InsightSectionContent';
+import { AddToPortfolioButton } from './AddToPortfolioButton';
 import { StockQuoteCard } from './StockQuoteCard';
 
 interface StockInsightsCardProps {
@@ -85,7 +86,7 @@ function SectionCard({ section }: { section: InsightSection }) {
         }}
       >
         <CardContent>
-          <Stack direction="row" spacing={1} sx={{ mb: 1.5, alignItems: 'center' }}>
+          <Stack direction="row" spacing={1.5} sx={{ mb: 1.5, alignItems: 'center' }}>
             <Box sx={{ color: meta.accent, display: 'flex' }}>{meta.icon}</Box>
             <Typography variant="h6">{section.title}</Typography>
           </Stack>
@@ -132,7 +133,8 @@ export function StockInsightsCard({ data }: StockInsightsCardProps) {
           </Typography>
         </Box>
 
-        <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
+        <Stack direction="row" spacing={1.5} sx={{ flexWrap: 'wrap', gap: 1.5, alignItems: 'center' }}>
+          <AddToPortfolioButton symbol={data.symbol} />
           {parsed.entryDecision && (
             <Chip
               label={parsed.entryDecision}
@@ -168,7 +170,7 @@ export function StockInsightsCard({ data }: StockInsightsCardProps) {
             sx={{ alignItems: { xs: 'stretch', md: 'center' } }}
           >
             <Box sx={{ flex: 1 }}>
-              <Stack direction="row" spacing={1} sx={{ mb: 1, alignItems: 'center' }}>
+              <Stack direction="row" spacing={1.5} sx={{ mb: 1, alignItems: 'center' }}>
                 <FlagOutlinedIcon color="primary" />
                 <Typography variant="h6">שורה תחתונה</Typography>
               </Stack>

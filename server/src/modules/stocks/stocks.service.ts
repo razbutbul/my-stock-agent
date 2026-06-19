@@ -4,9 +4,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import YahooFinance from 'yahoo-finance2';
-import { StockChartDto, StockCandleDto, StockChartTimeframeDto } from './stock-chart.dto';
+import {
+  StockChartDto,
+  StockCandleDto,
+  StockChartTimeframeDto,
+} from './stock-chart.dto';
 import { StockCompetitorsDto } from './stock-competitors.dto';
-import { StockFinancialPeriodDto, StockFinancialsDto } from './stock-financials.dto';
+import {
+  StockFinancialPeriodDto,
+  StockFinancialsDto,
+} from './stock-financials.dto';
 import { StockFundamentalsDto } from './stock-fundamentals.dto';
 import { StockNewsDto } from './stock-news.dto';
 import { StockQuoteDto } from './stock-quote.dto';
@@ -36,12 +43,22 @@ interface YahooChartQuote {
   volume: number | null;
 }
 
+interface YahooChartMeta {
+  currency?: string;
+  symbol?: string;
+  longName?: string;
+  shortName?: string;
+  regularMarketPrice?: number;
+  chartPreviousClose?: number;
+  regularMarketDayHigh?: number;
+  regularMarketDayLow?: number;
+  regularMarketVolume?: number;
+  fiftyTwoWeekHigh?: number;
+  fiftyTwoWeekLow?: number;
+}
+
 interface YahooChartResult {
-  meta?: {
-    currency?: string;
-    fiftyTwoWeekHigh?: number;
-    fiftyTwoWeekLow?: number;
-  };
+  meta?: YahooChartMeta;
   quotes?: YahooChartQuote[];
 }
 
@@ -57,7 +74,16 @@ interface YahooNewsArticle {
   summary?: string;
 }
 
+interface YahooSearchQuote {
+  symbol?: string;
+  shortname?: string;
+  longname?: string;
+  sector?: string;
+  industry?: string;
+}
+
 interface YahooSearchResult {
+  quotes?: YahooSearchQuote[];
   news?: YahooNewsArticle[];
 }
 
@@ -76,6 +102,7 @@ const YAHOO_MODULE_OPTIONS = { validateResult: false as const };
 export class StocksService {
   private readonly yahooFinance = new YahooFinance({
     suppressNotices: ['yahooSurvey'],
+    queue: { concurrency: 2, interval: 250 },
   });
 
   constructor(private readonly secEdgarService: SecEdgarService) {}
@@ -84,57 +111,30 @@ export class StocksService {
     const normalizedSymbol = this.normalizeSymbol(symbol);
 
     try {
-      const quote = (await this.yahooFinance.quote(
-        normalizedSymbol,
-        {
-        fields: [
-          'symbol',
-          'shortName',
-          'longName',
-          'regularMarketPrice',
-          'currency',
-          'regularMarketChange',
-          'regularMarketChangePercent',
-          'marketState',
-          'regularMarketPreviousClose',
-          'regularMarketDayHigh',
-          'regularMarketDayLow',
-          'regularMarketVolume',
-        ],
-        },
-        YAHOO_MODULE_OPTIONS,
-      )) as YahooStockQuote;
+      const quote = await this.fetchYahooQuote(normalizedSymbol);
 
-      this.logYahoo('quote.raw', normalizedSymbol, quote);
-
-      if (!quote?.regularMarketPrice) {
-        throw new NotFoundException(
-          `No data found for symbol "${normalizedSymbol}"`,
-        );
+      if (quote) {
+        this.logYahoo('quote.mapped', normalizedSymbol, quote);
+        return quote;
       }
-
-      const stockQuote: StockQuoteDto = {
-        symbol: quote.symbol ?? normalizedSymbol,
-        name: quote.longName ?? quote.shortName ?? normalizedSymbol,
-        price: quote.regularMarketPrice,
-        currency: quote.currency ?? 'USD',
-        change: quote.regularMarketChange ?? null,
-        changePercent: quote.regularMarketChangePercent ?? null,
-        marketState: quote.marketState ?? 'UNKNOWN',
-        previousClose: quote.regularMarketPreviousClose ?? null,
-        dayHigh: quote.regularMarketDayHigh ?? null,
-        dayLow: quote.regularMarketDayLow ?? null,
-        volume: quote.regularMarketVolume ?? null,
-      };
-
-      this.logYahoo('quote.mapped', normalizedSymbol, stockQuote);
-      return stockQuote;
     } catch (error) {
       this.rethrowKnownErrors(error);
-      throw new NotFoundException(
-        `Could not fetch quote for symbol "${normalizedSymbol}"`,
-      );
     }
+
+    try {
+      const fallbackQuote = await this.buildQuoteFromChart(normalizedSymbol);
+
+      if (fallbackQuote) {
+        this.logYahoo('quote.fallback.chart', normalizedSymbol, fallbackQuote);
+        return fallbackQuote;
+      }
+    } catch (error) {
+      this.rethrowKnownErrors(error);
+    }
+
+    throw new NotFoundException(
+      `Could not fetch quote for symbol "${normalizedSymbol}"`,
+    );
   }
 
   async getStockChart(symbol: string): Promise<StockChartDto> {
@@ -148,7 +148,8 @@ export class StocksService {
 
       const chart: StockChartDto = {
         symbol: normalizedSymbol,
-        currency: dailyResult.meta?.currency ?? weeklyResult.meta?.currency ?? 'USD',
+        currency:
+          dailyResult.meta?.currency ?? weeklyResult.meta?.currency ?? 'USD',
         fiftyTwoWeekHigh:
           dailyResult.meta?.fiftyTwoWeekHigh ??
           weeklyResult.meta?.fiftyTwoWeekHigh ??
@@ -175,96 +176,35 @@ export class StocksService {
     const normalizedSymbol = this.normalizeSymbol(symbol);
 
     try {
-      const summary = (await this.yahooFinance.quoteSummary(
-        normalizedSymbol,
-        {
-          modules: [
-            'summaryProfile',
-            'summaryDetail',
-            'financialData',
-            'defaultKeyStatistics',
-            'recommendationTrend',
-            'upgradeDowngradeHistory',
-            'earningsTrend',
-            'calendarEvents',
-          ],
-        },
-        YAHOO_MODULE_OPTIONS,
-      )) as Record<string, unknown>;
+      const fundamentals = await this.fetchYahooFundamentals(normalizedSymbol);
 
-      this.logYahoo('fundamentals.raw', normalizedSymbol, summary);
-
-      const profile = summary.summaryProfile as Record<string, unknown> | undefined;
-      const detail = summary.summaryDetail as Record<string, unknown> | undefined;
-      const financial = summary.financialData as Record<string, unknown> | undefined;
-      const stats = summary.defaultKeyStatistics as Record<string, unknown> | undefined;
-      const calendar = summary.calendarEvents as Record<string, unknown> | undefined;
-      const upgrades =
-        (summary.upgradeDowngradeHistory as { history?: YahooUpgradeDowngrade[] } | undefined)
-          ?.history ?? [];
-
-      const fundamentals: StockFundamentalsDto = {
-        symbol: normalizedSymbol,
-        name: this.asString(profile?.longName ?? profile?.shortName) ?? normalizedSymbol,
-        sector: this.asString(profile?.sector),
-        industry: this.asString(profile?.industry),
-        country: this.asString(profile?.country),
-        employees: this.asNumber(profile?.fullTimeEmployees),
-        businessSummary: this.truncateText(
-          this.asString(profile?.longBusinessSummary),
-          600,
-        ),
-        marketCap: this.asNumber(detail?.marketCap),
-        enterpriseValue: this.asNumber(stats?.enterpriseValue),
-        trailingPe: this.asNumber(stats?.trailingPE ?? detail?.trailingPE),
-        forwardPe: this.asNumber(stats?.forwardPE ?? detail?.forwardPE),
-        pegRatio: this.asNumber(stats?.pegRatio),
-        priceToBook: this.asNumber(stats?.priceToBook),
-        beta: this.asNumber(stats?.beta ?? detail?.beta),
-        fiftyTwoWeekChangePercent: this.asNumber(stats?.['52WeekChange']),
-        profitMargin: this.asNumber(
-          financial?.profitMargins ?? stats?.profitMargins,
-        ),
-        revenue: this.asNumber(financial?.totalRevenue),
-        revenueGrowth: this.asNumber(financial?.revenueGrowth),
-        grossMargin: this.asNumber(financial?.grossMargins),
-        operatingMargin: this.asNumber(financial?.operatingMargins),
-        ebitda: this.asNumber(financial?.ebitda),
-        freeCashflow: this.asNumber(financial?.freeCashflow),
-        debtToEquity: this.asNumber(financial?.debtToEquity),
-        currentRatio: this.asNumber(financial?.currentRatio),
-        analystRecommendation: this.asString(financial?.recommendationKey),
-        analystTargetMean: this.asNumber(financial?.targetMeanPrice),
-        analystTargetHigh: this.asNumber(financial?.targetHighPrice),
-        analystTargetLow: this.asNumber(financial?.targetLowPrice),
-        analystCount: this.asNumber(financial?.numberOfAnalystOpinions),
-        earningsGrowth: this.asNumber(stats?.earningsQuarterlyGrowth),
-        nextEarningsDate: this.formatDate(
-          (calendar?.earnings as { earningsDate?: unknown[] } | undefined)
-            ?.earningsDate?.[0],
-        ),
-        exDividendDate: this.formatDate(calendar?.exDividendDate),
-        recommendationTrend: summary.recommendationTrend ?? null,
-        recentUpgradesDowngrades: (upgrades as YahooUpgradeDowngrade[])
-          .slice(0, 8)
-          .map((item) => ({
-            firm: item.firm ?? 'Unknown',
-            toGrade: item.toGrade ?? 'N/A',
-            fromGrade: item.fromGrade ?? null,
-            action: item.action ?? 'N/A',
-            date: this.formatDate(item.epochGradeDate) ?? 'Unknown',
-          })),
-        earningsTrend: summary.earningsTrend ?? null,
-      };
-
-      this.logYahoo('fundamentals.mapped', normalizedSymbol, fundamentals);
-      return fundamentals;
+      if (fundamentals) {
+        this.logYahoo('fundamentals.mapped', normalizedSymbol, fundamentals);
+        return fundamentals;
+      }
     } catch (error) {
       this.rethrowKnownErrors(error);
-      throw new NotFoundException(
-        `Could not fetch fundamentals for symbol "${normalizedSymbol}"`,
-      );
     }
+
+    try {
+      const fallbackFundamentals =
+        await this.buildFundamentalsFallback(normalizedSymbol);
+
+      if (fallbackFundamentals) {
+        this.logYahoo(
+          'fundamentals.fallback',
+          normalizedSymbol,
+          fallbackFundamentals,
+        );
+        return fallbackFundamentals;
+      }
+    } catch (error) {
+      this.rethrowKnownErrors(error);
+    }
+
+    throw new NotFoundException(
+      `Could not fetch fundamentals for symbol "${normalizedSymbol}"`,
+    );
   }
 
   async getStockFinancials(symbol: string): Promise<StockFinancialsDto> {
@@ -292,7 +232,11 @@ export class StocksService {
       ]);
 
       this.logYahoo('financials.raw.income', normalizedSymbol, financialsRaw);
-      this.logYahoo('financials.raw.balance', normalizedSymbol, balanceSheetRaw);
+      this.logYahoo(
+        'financials.raw.balance',
+        normalizedSymbol,
+        balanceSheetRaw,
+      );
       this.logYahoo('financials.raw.cashflow', normalizedSymbol, cashFlowRaw);
 
       const yahooQuarterly = this.mergeFinancialPeriods(
@@ -301,11 +245,10 @@ export class StocksService {
         cashFlowRaw as YahooFinancialPeriod[],
       ).filter((period) => this.hasFinancialData(period));
 
-      const secQuarterly =
-        await this.secEdgarService.getQuarterlyFinancials(
-          normalizedSymbol,
-          MAX_FINANCIAL_QUARTERS,
-        );
+      const secQuarterly = await this.secEdgarService.getQuarterlyFinancials(
+        normalizedSymbol,
+        MAX_FINANCIAL_QUARTERS,
+      );
 
       this.logYahoo('financials.raw.sec', normalizedSymbol, secQuarterly);
 
@@ -436,6 +379,273 @@ export class StocksService {
     return normalizedSymbol;
   }
 
+  private async fetchYahooQuote(symbol: string): Promise<StockQuoteDto | null> {
+    const quote = (await this.yahooFinance.quote(
+      symbol,
+      {
+        fields: [
+          'symbol',
+          'shortName',
+          'longName',
+          'regularMarketPrice',
+          'currency',
+          'regularMarketChange',
+          'regularMarketChangePercent',
+          'marketState',
+          'regularMarketPreviousClose',
+          'regularMarketDayHigh',
+          'regularMarketDayLow',
+          'regularMarketVolume',
+        ],
+      },
+      YAHOO_MODULE_OPTIONS,
+    )) as YahooStockQuote;
+
+    this.logYahoo('quote.raw', symbol, quote);
+
+    if (!quote?.regularMarketPrice) {
+      return null;
+    }
+
+    return {
+      symbol: quote.symbol ?? symbol,
+      name: quote.longName ?? quote.shortName ?? symbol,
+      price: quote.regularMarketPrice,
+      currency: quote.currency ?? 'USD',
+      change: quote.regularMarketChange ?? null,
+      changePercent: quote.regularMarketChangePercent ?? null,
+      marketState: quote.marketState ?? 'UNKNOWN',
+      previousClose: quote.regularMarketPreviousClose ?? null,
+      dayHigh: quote.regularMarketDayHigh ?? null,
+      dayLow: quote.regularMarketDayLow ?? null,
+      volume: quote.regularMarketVolume ?? null,
+    };
+  }
+
+  private async buildQuoteFromChart(
+    symbol: string,
+  ): Promise<StockQuoteDto | null> {
+    const chartResult = await this.fetchChart(symbol, '1d', 7);
+    const meta = chartResult.meta;
+    const candles = chartResult.quotes ?? [];
+    const lastCandle = [...candles]
+      .reverse()
+      .find((candle) => candle.close !== null);
+    const previousCandle = [...candles]
+      .reverse()
+      .filter((candle) => candle.close !== null)[1];
+
+    const price = meta?.regularMarketPrice ?? lastCandle?.close ?? null;
+
+    if (price === null) {
+      return null;
+    }
+
+    const previousClose =
+      meta?.chartPreviousClose ?? previousCandle?.close ?? null;
+    const change = previousClose !== null ? price - previousClose : null;
+    const changePercent =
+      change !== null && previousClose ? (change / previousClose) * 100 : null;
+
+    return {
+      symbol: meta?.symbol ?? symbol,
+      name: meta?.longName ?? meta?.shortName ?? symbol,
+      price,
+      currency: meta?.currency ?? 'USD',
+      change,
+      changePercent,
+      marketState: 'UNKNOWN',
+      previousClose,
+      dayHigh: meta?.regularMarketDayHigh ?? lastCandle?.high ?? null,
+      dayLow: meta?.regularMarketDayLow ?? lastCandle?.low ?? null,
+      volume: meta?.regularMarketVolume ?? lastCandle?.volume ?? null,
+    };
+  }
+
+  private async fetchYahooFundamentals(
+    symbol: string,
+  ): Promise<StockFundamentalsDto | null> {
+    const summary = (await this.yahooFinance.quoteSummary(
+      symbol,
+      {
+        modules: [
+          'summaryProfile',
+          'summaryDetail',
+          'financialData',
+          'defaultKeyStatistics',
+          'recommendationTrend',
+          'upgradeDowngradeHistory',
+          'earningsTrend',
+          'calendarEvents',
+        ],
+      },
+      YAHOO_MODULE_OPTIONS,
+    )) as Record<string, unknown>;
+
+    this.logYahoo('fundamentals.raw', symbol, summary);
+
+    const profile = summary.summaryProfile as
+      | Record<string, unknown>
+      | undefined;
+    const detail = summary.summaryDetail as Record<string, unknown> | undefined;
+    const financial = summary.financialData as
+      | Record<string, unknown>
+      | undefined;
+    const stats = summary.defaultKeyStatistics as
+      | Record<string, unknown>
+      | undefined;
+    const calendar = summary.calendarEvents as
+      | Record<string, unknown>
+      | undefined;
+    const upgrades =
+      (
+        summary.upgradeDowngradeHistory as
+          | { history?: YahooUpgradeDowngrade[] }
+          | undefined
+      )?.history ?? [];
+
+    if (!profile && !detail && !financial && !stats) {
+      return null;
+    }
+
+    return {
+      symbol,
+      name: this.asString(profile?.longName ?? profile?.shortName) ?? symbol,
+      sector: this.asString(profile?.sector),
+      industry: this.asString(profile?.industry),
+      country: this.asString(profile?.country),
+      employees: this.asNumber(profile?.fullTimeEmployees),
+      businessSummary: this.truncateText(
+        this.asString(profile?.longBusinessSummary),
+        600,
+      ),
+      marketCap: this.asNumber(detail?.marketCap),
+      enterpriseValue: this.asNumber(stats?.enterpriseValue),
+      trailingPe: this.asNumber(stats?.trailingPE ?? detail?.trailingPE),
+      forwardPe: this.asNumber(stats?.forwardPE ?? detail?.forwardPE),
+      pegRatio: this.asNumber(stats?.pegRatio),
+      priceToBook: this.asNumber(stats?.priceToBook),
+      beta: this.asNumber(stats?.beta ?? detail?.beta),
+      fiftyTwoWeekChangePercent: this.asNumber(stats?.['52WeekChange']),
+      profitMargin: this.asNumber(
+        financial?.profitMargins ?? stats?.profitMargins,
+      ),
+      revenue: this.asNumber(financial?.totalRevenue),
+      revenueGrowth: this.asNumber(financial?.revenueGrowth),
+      grossMargin: this.asNumber(financial?.grossMargins),
+      operatingMargin: this.asNumber(financial?.operatingMargins),
+      ebitda: this.asNumber(financial?.ebitda),
+      freeCashflow: this.asNumber(financial?.freeCashflow),
+      debtToEquity: this.asNumber(financial?.debtToEquity),
+      currentRatio: this.asNumber(financial?.currentRatio),
+      analystRecommendation: this.asString(financial?.recommendationKey),
+      analystTargetMean: this.asNumber(financial?.targetMeanPrice),
+      analystTargetHigh: this.asNumber(financial?.targetHighPrice),
+      analystTargetLow: this.asNumber(financial?.targetLowPrice),
+      analystCount: this.asNumber(financial?.numberOfAnalystOpinions),
+      earningsGrowth: this.asNumber(stats?.earningsQuarterlyGrowth),
+      nextEarningsDate: this.formatDate(
+        (calendar?.earnings as { earningsDate?: unknown[] } | undefined)
+          ?.earningsDate?.[0],
+      ),
+      exDividendDate: this.formatDate(calendar?.exDividendDate),
+      recommendationTrend: summary.recommendationTrend ?? null,
+      recentUpgradesDowngrades: upgrades.slice(0, 8).map((item) => ({
+        firm: item.firm ?? 'Unknown',
+        toGrade: item.toGrade ?? 'N/A',
+        fromGrade: item.fromGrade ?? null,
+        action: item.action ?? 'N/A',
+        date: this.formatDate(item.epochGradeDate) ?? 'Unknown',
+      })),
+      earningsTrend: summary.earningsTrend ?? null,
+    };
+  }
+
+  private async buildFundamentalsFallback(
+    symbol: string,
+  ): Promise<StockFundamentalsDto | null> {
+    const [searchResult, chartResult, financials] = await Promise.all([
+      this.yahooFinance.search(
+        symbol,
+        { quotesCount: 1, newsCount: 0 },
+        YAHOO_MODULE_OPTIONS,
+      ) as Promise<YahooSearchResult>,
+      this.fetchChart(symbol, '1d', 30),
+      this.getStockFinancials(symbol).catch(() => null),
+    ]);
+
+    const searchQuote =
+      searchResult.quotes?.find(
+        (quote) => quote.symbol?.toUpperCase() === symbol,
+      ) ?? searchResult.quotes?.[0];
+    const meta = chartResult.meta;
+    const latestQuarter = financials?.quarterly.at(-1);
+    const latestRevenue = latestQuarter?.totalRevenue ?? null;
+    const latestNetIncome = latestQuarter?.netIncome ?? null;
+    const profitMargin =
+      latestRevenue && latestNetIncome ? latestNetIncome / latestRevenue : null;
+    const price = meta?.regularMarketPrice ?? null;
+    const fiftyTwoWeekChangePercent =
+      price && meta?.fiftyTwoWeekLow
+        ? ((price - meta.fiftyTwoWeekLow) / meta.fiftyTwoWeekLow) * 100
+        : null;
+
+    if (!searchQuote && !meta && !financials) {
+      return null;
+    }
+
+    return {
+      symbol,
+      name:
+        this.asString(searchQuote?.longname ?? searchQuote?.shortname) ??
+        meta?.longName ??
+        meta?.shortName ??
+        symbol,
+      sector: this.asString(searchQuote?.sector),
+      industry: this.asString(searchQuote?.industry),
+      country: null,
+      employees: null,
+      businessSummary: null,
+      marketCap: null,
+      enterpriseValue: null,
+      trailingPe: null,
+      forwardPe: null,
+      pegRatio: null,
+      priceToBook: null,
+      beta: null,
+      fiftyTwoWeekChangePercent,
+      profitMargin,
+      revenue: latestRevenue,
+      revenueGrowth: financials?.revenueGrowthYoY ?? null,
+      grossMargin:
+        latestRevenue && latestQuarter?.grossProfit
+          ? latestQuarter.grossProfit / latestRevenue
+          : null,
+      operatingMargin:
+        latestRevenue && latestQuarter?.operatingIncome
+          ? latestQuarter.operatingIncome / latestRevenue
+          : null,
+      ebitda: null,
+      freeCashflow: latestQuarter?.freeCashFlow ?? null,
+      debtToEquity:
+        latestQuarter?.totalDebt && latestQuarter?.totalAssets
+          ? latestQuarter.totalDebt / latestQuarter.totalAssets
+          : null,
+      currentRatio: null,
+      analystRecommendation: null,
+      analystTargetMean: null,
+      analystTargetHigh: null,
+      analystTargetLow: null,
+      analystCount: null,
+      earningsGrowth: financials?.netIncomeGrowthYoY ?? null,
+      nextEarningsDate: null,
+      exDividendDate: null,
+      recommendationTrend: null,
+      recentUpgradesDowngrades: [],
+      earningsTrend: null,
+    };
+  }
+
   private async fetchChart(
     symbol: string,
     interval: '1d' | '1wk',
@@ -526,9 +736,7 @@ export class StocksService {
 
       byQuarter.set(
         quarterKey,
-        existing
-          ? this.mergeFinancialPeriod(existing, period)
-          : { ...period },
+        existing ? this.mergeFinancialPeriod(existing, period) : { ...period },
       );
     }
 
@@ -563,9 +771,7 @@ export class StocksService {
     };
   }
 
-  private buildFinancialsDataNote(
-    dataSources: Array<'yahoo' | 'sec'>,
-  ): string {
+  private buildFinancialsDataNote(dataSources: Array<'yahoo' | 'sec'>): string {
     if (dataSources.includes('yahoo') && dataSources.includes('sec')) {
       return 'Quarterly history combines SEC EDGAR framed 10-Q data for older quarters with Yahoo Finance for recent cash-flow and balance-sheet enrichment.';
     }
@@ -603,7 +809,9 @@ export class StocksService {
       .map(([, period]) => this.mapFinancialPeriod(period));
   }
 
-  private mapFinancialPeriod(period: YahooFinancialPeriod): StockFinancialPeriodDto {
+  private mapFinancialPeriod(
+    period: YahooFinancialPeriod,
+  ): StockFinancialPeriodDto {
     return {
       date: this.formatDate(period.date) ?? 'Unknown',
       totalRevenue: this.pickNumber(
@@ -624,13 +832,21 @@ export class StocksService {
         'quarterlyOperatingIncome',
         'totalOperatingIncomeAsReported',
       ),
-      grossProfit: this.pickNumber(period, 'grossProfit', 'quarterlyGrossProfit'),
+      grossProfit: this.pickNumber(
+        period,
+        'grossProfit',
+        'quarterlyGrossProfit',
+      ),
       freeCashFlow: this.pickNumber(
         period,
         'freeCashFlow',
         'quarterlyFreeCashFlow',
       ),
-      totalAssets: this.pickNumber(period, 'totalAssets', 'quarterlyTotalAssets'),
+      totalAssets: this.pickNumber(
+        period,
+        'totalAssets',
+        'quarterlyTotalAssets',
+      ),
       totalDebt: this.pickNumber(
         period,
         'totalDebt',
@@ -690,7 +906,8 @@ export class StocksService {
       return null;
     }
 
-    const date = value instanceof Date ? value : new Date(value as string | number);
+    const date =
+      value instanceof Date ? value : new Date(value as string | number);
 
     if (Number.isNaN(date.getTime())) {
       return null;
@@ -718,7 +935,10 @@ export class StocksService {
   }
 
   private logYahoo(label: string, symbol: string, payload: unknown) {
-    console.log(`[Yahoo] ${label} (${symbol}):`, JSON.stringify(payload, null, 2));
+    console.log(
+      `[Yahoo] ${label} (${symbol}):`,
+      JSON.stringify(payload, null, 2),
+    );
   }
 
   private rethrowKnownErrors(error: unknown) {
