@@ -31,9 +31,9 @@ export function YahooToolsExplorer() {
         <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
           <StorageOutlinedIcon color="primary" />
           <Box>
-            <Typography variant="h6">בדיקת נתוני Yahoo</Typography>
+            <Typography variant="h6">בדיקת נתונים</Typography>
             <Typography variant="body2" color="text.secondary">
-              שליפה ישירה לכל tool — אותם נתונים שהסוכן שולח ל-LLM
+              שליפת נתוני מניות{" "}
             </Typography>
           </Box>
         </Stack>
