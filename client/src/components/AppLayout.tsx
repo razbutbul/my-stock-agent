@@ -1,17 +1,25 @@
+import MenuIcon from '@mui/icons-material/Menu';
 import AutoGraphOutlinedIcon from '@mui/icons-material/AutoGraphOutlined';
 import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined';
 import QueryStatsOutlinedIcon from '@mui/icons-material/QueryStatsOutlined';
 import {
   AppBar,
   Box,
-  Button,
   Container,
+  Divider,
+  Drawer,
+  IconButton,
   Link,
+  List,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
   Stack,
   Toolbar,
   Typography,
 } from '@mui/material';
 import type { ReactNode } from 'react';
+import { useState } from 'react';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
 import { StatusCard } from './StatusCard';
 import { useHealth } from '../hooks/useHealth';
@@ -21,87 +29,151 @@ interface AppLayoutProps {
 }
 
 const navItems = [
-  { label: 'ניתוח', to: '/', icon: QueryStatsOutlinedIcon },
-  { label: 'My Portfolio', to: '/portfolio', icon: AccountBalanceWalletOutlinedIcon },
+  { label: 'ניתוח הזדמנות', description: 'ניתוח מניה עם AI', to: '/', icon: QueryStatsOutlinedIcon },
+  {
+    label: 'My Portfolio',
+    description: 'המניות המועדפות שלך',
+    to: '/portfolio',
+    icon: AccountBalanceWalletOutlinedIcon,
+  },
 ];
 
 export function AppLayout({ children }: AppLayoutProps) {
   const location = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
   const {
     data: health,
     loading: healthLoading,
     error: healthError,
   } = useHealth();
 
+  const closeMenu = () => setMenuOpen(false);
+
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
-      <AppBar position="sticky" elevation={0} color="transparent">
-        <Toolbar
-          sx={{
-            borderBottom: 1,
-            borderColor: 'divider',
-            flexWrap: 'wrap',
-            gap: 1.5,
-            py: 1,
-          }}
-        >
-          <AutoGraphOutlinedIcon color="primary" sx={{ ml: 1 }} />
-          <Box sx={{ flexGrow: 1, minWidth: 200 }}>
-            <Typography variant="h6">Smart Stock Insight Agent</Typography>
-            <Typography variant="caption" color="text.secondary">
-              Developed by{' '}
-              <Link
-                href="https://www.linkedin.com/in/raz-butbul-07b465259/"
-                target="_blank"
-                rel="noopener noreferrer"
+      <AppBar
+        position="sticky"
+        elevation={0}
+        sx={{
+          bgcolor: 'background.default',
+          borderBottom: 1,
+          borderColor: 'divider',
+        }}
+      >
+        <Toolbar sx={{ gap: 1.5, py: 1, direction: 'ltr' }}>
+          <IconButton
+            edge="start"
+            color="inherit"
+            aria-label="פתח תפריט ניווט"
+            onClick={() => setMenuOpen(true)}
+          >
+            <MenuIcon />
+          </IconButton>
+
+          <Box sx={{ flexGrow: 1, minWidth: 0, direction: 'rtl', textAlign: 'right' }}>
+            <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', justifyContent: 'flex-end' }}>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography variant="h6" noWrap>
+                  Smart Stock Insight Agent
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
+                  Developed by{' '}
+                  <Link
+                    href="https://www.linkedin.com/in/raz-butbul-07b465259/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    sx={{
+                      color: 'primary.main',
+                      fontWeight: 600,
+                      textDecoration: 'none',
+                      '&:hover': { color: 'primary.light', textDecoration: 'none' },
+                    }}
+                  >
+                    Raz Butbul
+                  </Link>
+                </Typography>
+              </Box>
+              <AutoGraphOutlinedIcon color="primary" />
+            </Stack>
+          </Box>
+
+          <Box sx={{ display: { xs: 'none', md: 'block' } }}>
+            {!healthLoading && !healthError && health && <StatusCard data={health} />}
+            {healthError && (
+              <Typography variant="caption" color="error.main">
+                שרת לא זמין
+              </Typography>
+            )}
+          </Box>
+        </Toolbar>
+      </AppBar>
+
+      <Drawer
+        anchor="left"
+        open={menuOpen}
+        onClose={closeMenu}
+        slotProps={{
+          paper: {
+            sx: {
+              width: 280,
+              bgcolor: 'background.default',
+              borderInlineEnd: 1,
+              borderColor: 'divider',
+            },
+          },
+        }}
+      >
+        <Box sx={{ px: 2, py: 2.5 }}>
+          <Typography variant="h6">ניווט</Typography>
+          <Typography variant="body2" color="text.secondary">
+            בחר מסך
+          </Typography>
+        </Box>
+        <Divider />
+        <List sx={{ px: 1, py: 1 }}>
+          {navItems.map(({ label, description, to, icon: Icon }) => {
+            const active = location.pathname === to;
+
+            return (
+              <ListItemButton
+                key={to}
+                component={RouterLink}
+                to={to}
+                selected={active}
+                onClick={closeMenu}
                 sx={{
-                  color: 'primary.main',
-                  fontWeight: 600,
-                  textDecoration: 'none',
-                  transition: 'color 0.2s ease',
-                  '&:hover': {
-                    color: 'primary.light',
-                    textDecoration: 'none',
+                  borderRadius: 2,
+                  mb: 0.5,
+                  '&.Mui-selected': {
+                    bgcolor: 'rgba(0, 200, 150, 0.12)',
+                    '&:hover': { bgcolor: 'rgba(0, 200, 150, 0.18)' },
                   },
                 }}
               >
-                Raz Butbul
-              </Link>
-            </Typography>
-          </Box>
-
-          <Stack direction="row" spacing={1.5} sx={{ flexWrap: 'wrap' }}>
-            {navItems.map(({ label, to, icon: Icon }) => {
-              const active = location.pathname === to;
-
-              return (
-                <Button
-                  key={to}
-                  component={RouterLink}
-                  to={to}
-                  variant="text"
-                  color="inherit"
-                  startIcon={<Icon color={active ? 'primary' : 'inherit'} />}
-                  sx={{
-                    color: active ? 'primary.main' : 'text.secondary',
-                    fontWeight: active ? 700 : 500,
-                    whiteSpace: 'nowrap',
+                <ListItemIcon sx={{ minWidth: 40, color: active ? 'primary.main' : 'text.secondary' }}>
+                  <Icon />
+                </ListItemIcon>
+                <ListItemText
+                  primary={label}
+                  secondary={description}
+                  slotProps={{
+                    primary: { sx: { fontWeight: active ? 700 : 500 } },
                   }}
-                >
-                  {label}
-                </Button>
-              );
-            })}
-          </Stack>
-
+                />
+              </ListItemButton>
+            );
+          })}
+        </List>
+        <Divider sx={{ mt: 'auto' }} />
+        <Box sx={{ px: 2, py: 2 }}>
           {!healthLoading && !healthError && health && <StatusCard data={health} />}
           {healthError && (
             <Typography variant="caption" color="error.main">
               שרת לא זמין
             </Typography>
           )}
-        </Toolbar>
-      </AppBar>
+        </Box>
+      </Drawer>
 
       <Container maxWidth="lg" sx={{ py: { xs: 3, md: 4 } }}>
         {children}

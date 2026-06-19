@@ -9,8 +9,8 @@ import {
 } from "@mui/material";
 import { StockInsightsCard } from "../components/StockInsightsCard";
 import { StockLookupForm } from "../components/StockLookupForm";
-import { YahooToolsExplorer } from "../components/YahooToolsExplorer";
 import { useStockAnalysis } from "../hooks/useStockAnalysis";
+import { YahooToolsExplorer } from "../components/YahooToolsExplorer";
 
 export function HomePage() {
   const {
@@ -24,7 +24,7 @@ export function HomePage() {
     <Stack spacing={3}>
       <Paper sx={{ p: { xs: 2, md: 3 } }}>
         <Stack spacing={2}>
-          <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
             <QueryStatsOutlinedIcon color="primary" />
             <Box>
               <Typography variant="h5">ניתוח הזדמנות</Typography>
@@ -51,7 +51,6 @@ export function HomePage() {
       {insight && !analysisLoading && !analysisError && (
         <StockInsightsCard data={insight} />
       )}
-
       <YahooToolsExplorer />
     </Stack>
   );

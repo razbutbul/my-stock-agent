@@ -1,5 +1,6 @@
 import { API_BASE_URL } from './config';
 import type {
+  HotStocks,
   StockChart,
   StockCompetitors,
   StockFinancials,
@@ -49,4 +50,21 @@ export function fetchStockNews(symbol: string): Promise<StockNews> {
 
 export function fetchStockCompetitors(symbol: string): Promise<StockCompetitors> {
   return fetchStockResource<StockCompetitors>(symbol, 'competitors');
+}
+
+export async function fetchHotStocks(): Promise<HotStocks> {
+  const response = await fetch(`${API_BASE_URL}/stocks/hot`);
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as {
+      message?: string | string[];
+    } | null;
+    const message = Array.isArray(body?.message)
+      ? body.message.join(', ')
+      : body?.message;
+
+    throw new Error(message ?? `Hot stocks request failed (${response.status})`);
+  }
+
+  return response.json() as Promise<HotStocks>;
 }

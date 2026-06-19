@@ -125,6 +125,26 @@ export interface StockCompetitors {
   }>;
 }
 
+export type HotStockReason = 'trending' | 'most_active' | 'day_gainer';
+
+export interface HotStockItem {
+  symbol: string;
+  name: string;
+  price: number | null;
+  changePercent: number | null;
+  volume: number | null;
+  reasons: HotStockReason[];
+  headline: string | null;
+  summary: string | null;
+}
+
+export interface HotStocks {
+  region: string;
+  updatedAt: string;
+  overview: string;
+  stocks: HotStockItem[];
+}
+
 export type YahooToolId =
   | 'get_stock_quote'
   | 'get_stock_chart'

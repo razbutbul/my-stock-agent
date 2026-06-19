@@ -15,6 +15,11 @@ import {
   StockFinancialsDto,
 } from './stock-financials.dto';
 import { StockFundamentalsDto } from './stock-fundamentals.dto';
+import {
+  HotStockItemDto,
+  HotStockReason,
+  HotStocksDto,
+} from './stock-hot.dto';
 import { StockNewsDto } from './stock-news.dto';
 import { StockQuoteDto } from './stock-quote.dto';
 import { SecEdgarService } from './sec-edgar.service';
@@ -85,6 +90,33 @@ interface YahooSearchQuote {
 interface YahooSearchResult {
   quotes?: YahooSearchQuote[];
   news?: YahooNewsArticle[];
+}
+
+interface YahooScreenerQuote {
+  symbol?: string;
+  shortName?: string;
+  longName?: string;
+  quoteType?: string;
+  regularMarketPrice?: number;
+  regularMarketChangePercent?: number;
+  regularMarketVolume?: number;
+}
+
+interface YahooScreenerResult {
+  quotes?: YahooScreenerQuote[];
+}
+
+interface YahooTrendingResult {
+  quotes?: Array<{ symbol?: string }>;
+}
+
+interface HotStockAccumulator {
+  symbol: string;
+  name: string | null;
+  price: number | null;
+  changePercent: number | null;
+  volume: number | null;
+  reasons: Set<HotStockReason>;
 }
 
 interface YahooUpgradeDowngrade {
@@ -333,6 +365,140 @@ export class StocksService {
     }
   }
 
+  async getHotStocks(): Promise<HotStocksDto> {
+    try {
+      const [trending, mostActives, dayGainers] = await Promise.all([
+        this.yahooFinance.trendingSymbols(
+          'US',
+          { count: 15 },
+          YAHOO_MODULE_OPTIONS,
+        ) as Promise<YahooTrendingResult>,
+        this.yahooFinance.screener(
+          { scrIds: 'most_actives', count: 15 },
+          undefined,
+          YAHOO_MODULE_OPTIONS,
+        ) as Promise<YahooScreenerResult>,
+        this.yahooFinance.screener(
+          { scrIds: 'day_gainers', count: 15 },
+          undefined,
+          YAHOO_MODULE_OPTIONS,
+        ) as Promise<YahooScreenerResult>,
+      ]);
+
+      this.logYahoo('hot.raw.trending', 'US', trending);
+      this.logYahoo('hot.raw.most_actives', 'US', mostActives);
+      this.logYahoo('hot.raw.day_gainers', 'US', dayGainers);
+
+      const stockMap = new Map<string, HotStockAccumulator>();
+
+      for (const item of trending.quotes ?? []) {
+        if (item.symbol) {
+          this.addHotStockCandidate(stockMap, item.symbol, 'trending');
+        }
+      }
+
+      for (const quote of mostActives.quotes ?? []) {
+        if (quote.symbol && this.isUsEquity(quote)) {
+          this.addHotStockCandidate(
+            stockMap,
+            quote.symbol,
+            'most_active',
+            quote,
+          );
+        }
+      }
+
+      for (const quote of dayGainers.quotes ?? []) {
+        if (quote.symbol && this.isUsEquity(quote)) {
+          this.addHotStockCandidate(
+            stockMap,
+            quote.symbol,
+            'day_gainer',
+            quote,
+          );
+        }
+      }
+
+      const ranked = [...stockMap.values()]
+        .sort((left, right) => {
+          const reasonDiff = right.reasons.size - left.reasons.size;
+
+          if (reasonDiff !== 0) {
+            return reasonDiff;
+          }
+
+          return (
+            Math.abs(right.changePercent ?? 0) -
+            Math.abs(left.changePercent ?? 0)
+          );
+        })
+        .slice(0, 12);
+
+      const symbolsMissingQuotes = ranked
+        .filter((stock) => stock.price === null)
+        .map((stock) => stock.symbol);
+
+      if (symbolsMissingQuotes.length) {
+        const quotes = (await this.yahooFinance.quote(
+          symbolsMissingQuotes,
+          {
+            fields: [
+              'symbol',
+              'shortName',
+              'longName',
+              'regularMarketPrice',
+              'regularMarketChangePercent',
+              'regularMarketVolume',
+              'quoteType',
+            ],
+          },
+          YAHOO_MODULE_OPTIONS,
+        )) as YahooScreenerQuote | YahooScreenerQuote[];
+
+        const quoteList = Array.isArray(quotes) ? quotes : [quotes];
+
+        for (const quote of quoteList) {
+          if (!quote.symbol || !this.isUsEquity(quote)) {
+            continue;
+          }
+
+          const stock = stockMap.get(quote.symbol);
+
+          if (!stock) {
+            continue;
+          }
+
+          stock.name =
+            quote.shortName ?? quote.longName ?? stock.name ?? quote.symbol;
+          stock.price = quote.regularMarketPrice ?? stock.price;
+          stock.changePercent =
+            quote.regularMarketChangePercent ?? stock.changePercent;
+          stock.volume = quote.regularMarketVolume ?? stock.volume;
+        }
+      }
+
+      const stocks = await Promise.all(
+        ranked
+          .filter((stock) => stock.price !== null || stock.name)
+          .map((stock) => this.buildHotStockItem(stock)),
+      );
+
+      const hotStocks: HotStocksDto = {
+        region: 'US',
+        updatedAt: new Date().toISOString(),
+        overview:
+          'מניות שנבחרו לפי חיפושים פופולריים, נפח מסחר גבוה ועליות יומיות ב-Yahoo Finance',
+        stocks,
+      };
+
+      this.logYahoo('hot.mapped', 'US', hotStocks);
+      return hotStocks;
+    } catch (error) {
+      this.rethrowKnownErrors(error);
+      throw new NotFoundException('Could not fetch hot stocks');
+    }
+  }
+
   async getStockCompetitors(symbol: string): Promise<StockCompetitorsDto> {
     const normalizedSymbol = this.normalizeSymbol(symbol);
 
@@ -367,6 +533,92 @@ export class StocksService {
         `Could not fetch competitors for symbol "${normalizedSymbol}"`,
       );
     }
+  }
+
+  private addHotStockCandidate(
+    stockMap: Map<string, HotStockAccumulator>,
+    symbol: string,
+    reason: HotStockReason,
+    quote?: YahooScreenerQuote,
+  ) {
+    if (!this.isEligibleHotSymbol(symbol)) {
+      return;
+    }
+
+    const existing = stockMap.get(symbol) ?? {
+      symbol,
+      name: null,
+      price: null,
+      changePercent: null,
+      volume: null,
+      reasons: new Set<HotStockReason>(),
+    };
+
+    existing.reasons.add(reason);
+
+    if (quote) {
+      existing.name =
+        quote.shortName ?? quote.longName ?? existing.name ?? symbol;
+      existing.price = quote.regularMarketPrice ?? existing.price;
+      existing.changePercent =
+        quote.regularMarketChangePercent ?? existing.changePercent;
+      existing.volume = quote.regularMarketVolume ?? existing.volume;
+    }
+
+    stockMap.set(symbol, existing);
+  }
+
+  private async buildHotStockItem(
+    stock: HotStockAccumulator,
+  ): Promise<HotStockItemDto> {
+    let headline: string | null = null;
+    let summary: string | null = null;
+
+    try {
+      const searchResult = (await this.yahooFinance.search(
+        stock.symbol,
+        {
+          quotesCount: 0,
+          newsCount: 1,
+        },
+        YAHOO_MODULE_OPTIONS,
+      )) as YahooSearchResult;
+
+      const article = searchResult.news?.[0];
+      headline = article?.title ?? null;
+      summary = this.truncateText(
+        typeof article?.summary === 'string' ? article.summary : null,
+        180,
+      );
+    } catch {
+      // News is optional context for hot stocks.
+    }
+
+    return {
+      symbol: stock.symbol,
+      name: stock.name ?? stock.symbol,
+      price: stock.price,
+      changePercent: stock.changePercent,
+      volume: stock.volume,
+      reasons: [...stock.reasons],
+      headline,
+      summary,
+    };
+  }
+
+  private isEligibleHotSymbol(symbol: string): boolean {
+    if (!symbol || symbol.includes('-USD') || symbol.startsWith('^')) {
+      return false;
+    }
+
+    return !/\.(TO|L|HK|AX|PA|DE|SW|MI)$/i.test(symbol);
+  }
+
+  private isUsEquity(quote: YahooScreenerQuote): boolean {
+    return (
+      this.isEligibleHotSymbol(quote.symbol ?? '') &&
+      (quote.quoteType === undefined || quote.quoteType === 'EQUITY')
+    );
   }
 
   private normalizeSymbol(symbol: string): string {

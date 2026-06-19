@@ -10,6 +10,9 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
+import { useState } from 'react';
+import { PortfolioCompactGrid } from '../components/PortfolioCompactGrid';
+import { PortfolioViewToggle, type PortfolioViewMode } from '../components/PortfolioViewToggle';
 import { StockLookupForm } from '../components/StockLookupForm';
 import { StockQuoteCard } from '../components/StockQuoteCard';
 import { useFavorites } from '../hooks/useFavorites';
@@ -23,6 +26,7 @@ function formatAddedAt(value: string): string {
 }
 
 export function PortfolioPage() {
+  const [viewMode, setViewMode] = useState<PortfolioViewMode>('detailed');
   const {
     favorites,
     loading: favoritesLoading,
@@ -50,7 +54,7 @@ export function PortfolioPage() {
             <Box>
               <Typography variant="h5">My Portfolio</Typography>
               <Typography variant="body2" color="text.secondary">
-                המניות המועדפות שלך — מחירים בזמן אמת מ-Yahoo Finance
+                המניות המועדפות שלך — מחירים בזמן אמת
               </Typography>
             </Box>
           </Stack>
@@ -85,59 +89,79 @@ export function PortfolioPage() {
 
       {!favoritesLoading && favorites.length > 0 && (
         <Stack spacing={2}>
-          <Stack
-            direction="row"
-            spacing={1}
-            sx={{ alignItems: 'center', justifyContent: 'space-between' }}
-          >
-            <Typography variant="subtitle1" color="text.secondary">
-              {favorites.length} מניות בתיק
-            </Typography>
-            {quotesLoading && <LinearProgress sx={{ flex: 1, maxWidth: 200 }} />}
+          <Stack spacing={1.5}>
+            <Stack
+              direction="row"
+              spacing={1}
+              sx={{ alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}
+            >
+              <Typography variant="subtitle1" color="text.secondary">
+                {favorites.length} מניות בתיק
+              </Typography>
+              {quotesLoading && <LinearProgress sx={{ flex: 1, maxWidth: 200 }} />}
+            </Stack>
+
+            <PortfolioViewToggle value={viewMode} onChange={setViewMode} />
           </Stack>
 
-          {favorites.map((favorite) => {
-            const quote = quotes[favorite.symbol];
-            const quoteError = quoteErrors[favorite.symbol];
+          {viewMode === 'compact' ? (
+            <PortfolioCompactGrid
+              favorites={favorites}
+              quotes={quotes}
+              quoteErrors={quoteErrors}
+              quotesLoading={quotesLoading}
+              actionLoading={actionLoading}
+              onRemove={(symbol) => {
+                void remove(symbol);
+              }}
+            />
+          ) : (
+            favorites.map((favorite) => {
+              const quote = quotes[favorite.symbol];
+              const quoteError = quoteErrors[favorite.symbol];
 
-            return (
-              <Paper key={favorite.id} sx={{ p: { xs: 2, md: 2.5 } }}>
-                <Stack spacing={2}>
-                  <Stack
-                    direction={{ xs: 'column', sm: 'row' }}
-                    spacing={1}
-                    sx={{ alignItems: { xs: 'flex-start', sm: 'center' }, justifyContent: 'space-between' }}
-                  >
-                    <Box>
-                      <Typography variant="h6">{favorite.symbol}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        נוסף ב-{formatAddedAt(favorite.addedAt)}
-                      </Typography>
-                    </Box>
-
-                    <Button
-                      variant="outlined"
-                      color="error"
-                      size="small"
-                      startIcon={<DeleteOutlinedIcon />}
-                      disabled={isLoading}
-                      onClick={() => {
-                        void remove(favorite.symbol);
+              return (
+                <Paper key={favorite.id} sx={{ p: { xs: 2, md: 2.5 } }}>
+                  <Stack spacing={2}>
+                    <Stack
+                      direction={{ xs: 'column', sm: 'row' }}
+                      spacing={1}
+                      sx={{
+                        alignItems: { xs: 'flex-start', sm: 'center' },
+                        justifyContent: 'space-between',
                       }}
                     >
-                      הסר מהתיק
-                    </Button>
+                      <Box>
+                        <Typography variant="h6">{favorite.symbol}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          נוסף ב-{formatAddedAt(favorite.addedAt)}
+                        </Typography>
+                      </Box>
+
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        size="small"
+                        startIcon={<DeleteOutlinedIcon />}
+                        disabled={isLoading}
+                        onClick={() => {
+                          void remove(favorite.symbol);
+                        }}
+                      >
+                        הסר מהתיק
+                      </Button>
+                    </Stack>
+
+                    {quoteError && <Alert severity="warning">{quoteError}</Alert>}
+
+                    {quote && <StockQuoteCard data={quote} compact />}
+
+                    {!quote && !quoteError && quotesLoading && <LinearProgress />}
                   </Stack>
-
-                  {quoteError && <Alert severity="warning">{quoteError}</Alert>}
-
-                  {quote && <StockQuoteCard data={quote} compact />}
-
-                  {!quote && !quoteError && quotesLoading && <LinearProgress />}
-                </Stack>
-              </Paper>
-            );
-          })}
+                </Paper>
+              );
+            })
+          )}
         </Stack>
       )}
     </Stack>

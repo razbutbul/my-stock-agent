@@ -1,30 +1,34 @@
-import StorageOutlinedIcon from '@mui/icons-material/StorageOutlined';
-import { Box, Paper, Stack, Typography } from '@mui/material';
+import StorageOutlinedIcon from "@mui/icons-material/StorageOutlined";
+import { Box, Paper, Stack, Typography } from "@mui/material";
 import {
-  fetchStockChart,
-  fetchStockCompetitors,
-  fetchStockFinancials,
-  fetchStockFundamentals,
-  fetchStockNews,
+  // fetchStockChart,
+  // fetchStockCompetitors,
+  // fetchStockFinancials,
+  // fetchStockFundamentals,
+  // fetchStockNews,
+  fetchHotStocks,
   fetchStockQuote,
-} from '../api/stocks';
-import { useYahooToolFetch } from '../hooks/useYahooToolFetch';
-import { JsonDataCard } from './JsonDataCard';
-import { StockQuoteCard } from './StockQuoteCard';
-import { YahooToolSection } from './YahooToolSection';
+} from "../api/stocks";
+import { useYahooToolAction } from "../hooks/useYahooToolAction";
+import { useYahooToolFetch } from "../hooks/useYahooToolFetch";
+// import { JsonDataCard } from "./JsonDataCard";
+import { HotStocksCard } from "./HotStocksCard";
+import { StockQuoteCard } from "./StockQuoteCard";
+import { YahooToolSection } from "./YahooToolSection";
 
 export function YahooToolsExplorer() {
   const quote = useYahooToolFetch(fetchStockQuote);
-  const chart = useYahooToolFetch(fetchStockChart);
-  const fundamentals = useYahooToolFetch(fetchStockFundamentals);
-  const financials = useYahooToolFetch(fetchStockFinancials);
-  const news = useYahooToolFetch(fetchStockNews);
-  const competitors = useYahooToolFetch(fetchStockCompetitors);
+  const hotStocks = useYahooToolAction(fetchHotStocks);
+  // const chart = useYahooToolFetch(fetchStockChart);
+  // const fundamentals = useYahooToolFetch(fetchStockFundamentals);
+  // const financials = useYahooToolFetch(fetchStockFinancials);
+  // const news = useYahooToolFetch(fetchStockNews);
+  // const competitors = useYahooToolFetch(fetchStockCompetitors);
 
   return (
     <Paper sx={{ p: { xs: 2, md: 3 } }}>
       <Stack spacing={2.5}>
-        <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
           <StorageOutlinedIcon color="primary" />
           <Box>
             <Typography variant="h6">בדיקת נתוני Yahoo</Typography>
@@ -33,6 +37,20 @@ export function YahooToolsExplorer() {
             </Typography>
           </Box>
         </Stack>
+
+        <YahooToolSection
+          toolName="get_hot_stocks"
+          title="מניות חמות"
+          description="מניות פעילות מהימים האחרונים — טרנדינג, נפח מסחר גבוה ועליות יומיות, עם הסבר קצר מחדשות"
+          submitLabel="שלוף מניות חמות"
+          loadingLabel="שולף..."
+          requiresSymbol={false}
+          loading={hotStocks.loading}
+          error={hotStocks.error}
+          onSubmit={hotStocks.fetch}
+        >
+          {hotStocks.data && <HotStocksCard data={hotStocks.data} />}
+        </YahooToolSection>
 
         <YahooToolSection
           toolName="get_stock_quote"
@@ -48,7 +66,7 @@ export function YahooToolsExplorer() {
           {quote.data && <StockQuoteCard data={quote.data} />}
         </YahooToolSection>
 
-        <YahooToolSection
+        {/* <YahooToolSection
           toolName="get_stock_chart"
           title="נרות ומומנטום"
           description="60 נרות יומיים, 26 שבועיים, סיכום מגמה ו-52 שבוע"
@@ -116,7 +134,7 @@ export function YahooToolsExplorer() {
           onSubmit={competitors.fetch}
         >
           {competitors.data && <JsonDataCard data={competitors.data} />}
-        </YahooToolSection>
+        </YahooToolSection> */}
       </Stack>
     </Paper>
   );
